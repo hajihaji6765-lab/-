@@ -1,7 +1,7 @@
 [app]
 
-title = My Python App
-package.name = mypythonapp
+title = TestCamera
+package.name = testcamera
 package.domain = org.hajihaji6765
 
 source.dir = .
