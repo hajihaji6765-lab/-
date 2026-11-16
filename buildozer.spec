@@ -1,6 +1,6 @@
 [app]
-
 title = TestCamera
+android.accept_sdk_license = True
 package.name = testcamera
 package.domain = org.hajihaji6765
 
